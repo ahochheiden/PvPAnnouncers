@@ -1,0 +1,7 @@
+## Interface: 70100
+## Title: PvP Announcers
+## Author: Alex
+## Notes: Adds HoN and DotA announcers to PvP events
+## Version: 0.0.1
+
+PvPAnnouncers.lua
