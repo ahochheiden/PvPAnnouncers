@@ -101,18 +101,19 @@ function PvPAnnouncers:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, 
 	end
 	-- Speed Buff
 	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 23451 then
-		print("speed")
 		PlaySoundFile(self:getSoundFilePath("powerUpSpeed"), "Master")
 	end
 	-- Damage Buff
 	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 23505 then
-		print("damage")
 		PlaySoundFile(self:getSoundFilePath("powerUpDamage"), "Master")
 	end
 	-- Regeneration Buff
 	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 23493 then
-		print("regen")
 		PlaySoundFile(self:getSoundFilePath("powerUpRegeneration"), "Master")
+	end
+	-- Invisibility Buff
+	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 58984 and (self:isPvPZone(GetZoneText())) then
+		PlaySoundFile(self:getSoundFilePath("powerUpInvisibility"), "Master")
 	end
 end
 
