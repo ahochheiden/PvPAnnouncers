@@ -50,7 +50,7 @@ local onUpdate = function(self, elapsed)
 	if soundUpdate > 2 then
 		soundUpdate = 0
 		if nextSound then
-			PlaySoundFile(nextSound)
+			PlaySoundFile(self:getSoundFilePath(nextSound), "Master")
 			nextSound = nil
 		end
 	end
@@ -87,8 +87,10 @@ function PvPAnnouncers:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, 
 		if (UnitHealth("player") / UnitHealthMax("player") * 100 <= 25) and (UnitHealth("player") > 1) then
 			PlaySoundFile(self:getSoundFilePath("smackDown"), "Master")
 		end
+		
 		killTime = now
 		killStreak = killStreak + 1
+		
 		self:PlaySounds()
 	end
 	-- Rage Quit on Paladin Divine Shield
@@ -120,12 +122,13 @@ end
 function PvPAnnouncers:PlaySounds()
 	local multiKillFileName = killSounds[math.min(5, multiKill)]
 	local killSpreeFileName = spreeSounds[math.min(15, killStreak)]
-	
+		
 	if multiKillFileName then
 		PlaySoundFile(self:getSoundFilePath(multiKillFileName), "Master")
 	end
-	if killSpreeLocation then
-		local killSpreePath = PlaySoundFile(self:getSoundFilePath(killSpreeFileName))
+	
+	if killSpreeFileName then
+		local killSpreePath = self:getSoundFilePath(killSpreeFileName)
 
 		if not multiKillFileName then
 			PlaySoundFile(killSpreePath, "Master")
