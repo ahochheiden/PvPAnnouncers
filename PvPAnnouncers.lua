@@ -226,6 +226,9 @@ function PvPAnnouncers:PlaySounds()
 			end
 		end
 	end	
+	
+	-- set to nil after other checks so smackdown isn't played again for all subsequent kills
+	nextSoundSmackdownPath = nil
 end
 
 -- resets all local variables to their default state
