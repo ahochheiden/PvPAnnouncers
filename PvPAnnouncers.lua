@@ -7,7 +7,22 @@ local killStreak = 0
 local multiKill = 0
 local killTime = 0
 local soundUpdate = 0
-local nextSound = nil
+local nextSoundSmackdownPath = nil
+local nextSoundMultiKillPath = nil
+local nextSoundKillSpreePath = nil
+
+-- spellId constants
+local deserterSpellId = 26013
+local speedSpellId = 23451
+local berserkingSpellId = 23505
+local restorationSpellId = 23493
+local shadowmeldSpellId = 58984
+local invisibilitySpellId = 66
+local greaterInvisibilitySpellId = 110959
+local shroudOfConcealmentSpellId = 115834
+
+-- debug
+local debug = false
 
 -- kill spree sounds filename table
 local spreeSounds = {
@@ -29,7 +44,7 @@ local spreeSounds = {
 }
 
 -- multikill sounds filename table
-local killSounds = {
+local multiKillSounds = {
 	[2] = "kill2",
 	[3] = "kill3",
 	[4] = "kill4",
@@ -41,17 +56,39 @@ local function hasFlag(flags, flag)
 	return bit.band(flags, flag) == flag
 end
 
+-- #TODO figure out why I need this
 local onEvent = function(self, event, ...)
 	self[event](self, event, ...)
 end
 
+-- plays second sound after a delay if both multi and spree were true
 local onUpdate = function(self, elapsed)
 	soundUpdate = soundUpdate + elapsed
 	if soundUpdate > 2 then
 		soundUpdate = 0
-		if nextSound then
-			PlaySoundFile(self:getSoundFilePath(nextSound), "Master")
-			nextSound = nil
+		
+		-- plays the delayed multi kill sound
+		if nextSoundMultiKillPath then
+			PlaySoundFile(nextSoundMultiKillPath, "Master")
+			
+			if debug then
+				print("next sound path")
+				print(nextSoundMultiKillPath)
+			end
+			
+			nextSoundMultiKillPath = nil
+		else
+			-- plays the delayed killing spree sound if there was no multi kill
+			if nextSoundKillSpreePath then
+				PlaySoundFile(nextSoundKillSpreePath, "Master")
+			
+				if debug then
+					print("next sound path")
+					print(nextSoundKillSpreePath)
+				end
+			
+				nextSoundKillSpreePath = nil
+			end
 		end
 	end
 end
@@ -69,6 +106,7 @@ function PvPAnnouncers:PLAYER_DEAD()
 	self:resetState()
 end
 
+-- plays startGame sound upon entering a PvP zone
 function PvPAnnouncers:ZONE_CHANGED_NEW_AREA()
 	if (self:isPvPZone(GetZoneText())) then
 		PlaySoundFile(self:getSoundFilePath("startGame"), "Master")
@@ -76,66 +114,118 @@ function PvPAnnouncers:ZONE_CHANGED_NEW_AREA()
 	end
 end
 
+-- main function
 function PvPAnnouncers:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName, spellSchool, auraType, ...)
-	if eventType == "PARTY_KILL" and hasFlag(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and hasFlag(destFlags, COMBATLOG_OBJECT_TYPE_PLAYER) then
+	-- on pvp kill logic	
+	if eventType == "PARTY_KILL" and hasFlag(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and (hasFlag(destFlags, COMBATLOG_OBJECT_TYPE_PLAYER) or debug) then
 		local now = GetTime()
+		
+		-- check if kill occurred within multi kill time window
 		if killTime + killResetTime > now then
 			multiKill = multiKill + 1
 		else
 			multiKill = 1
 		end
+		
+		-- smackdown if a kill is made when the player is below 25% health
 		if (UnitHealth("player") / UnitHealthMax("player") * 100 <= 25) and (UnitHealth("player") > 1) then
-			PlaySoundFile(self:getSoundFilePath("smackDown"), "Master")
+			nextSoundSmackdownPath = self:getSoundFilePath("smackDown")
 		end
 		
+		-- set kill time and increase streak by one
 		killTime = now
 		killStreak = killStreak + 1
 		
+		-- play relevant kill sounds
 		self:PlaySounds()
 	end
+	
 	-- Rage Quit on Paladin Divine Shield
 	if eventType == "SPELL_CAST_SUCCESS" and hasFlag(sourceFlags, COMBATLOG_OBJECT_TARGET) and hasFlag(sourceFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) and spellName == "Divine Shield" then
 		PlaySoundFile(self:getSoundFilePath("rageQuit"), "Master")
 	end
 	-- Rage Quit on Deserter
-	if eventType == "SPELL_AURA_APPLIED" and hasFlag(sourceFlags, COMBATLOG_OBJECT_TARGET) and hasFlag(sourceFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) and spellId == 26013 then
+	if eventType == "SPELL_AURA_APPLIED" and hasFlag(sourceFlags, COMBATLOG_OBJECT_TARGET) and hasFlag(sourceFlags, COMBATLOG_OBJECT_REACTION_HOSTILE) and spellId == deserterSpellId then
 		PlaySoundFile(self:getSoundFilePath("rageQuit"), "Master")
 	end
 	-- Speed Buff
-	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 23451 then
+	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == speedSpellId then
 		PlaySoundFile(self:getSoundFilePath("powerUpSpeed"), "Master")
 	end
 	-- Damage Buff
-	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 23505 then
+	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == berserkingSpellId then
 		PlaySoundFile(self:getSoundFilePath("powerUpDamage"), "Master")
 	end
-	-- Regeneration Buff
-	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 23493 then
+	-- Restoration Buff
+	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == restorationSpellId then
 		PlaySoundFile(self:getSoundFilePath("powerUpRegeneration"), "Master")
 	end
 	-- Invisibility Buff
-	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and spellId == 58984 and (self:isPvPZone(GetZoneText())) then
+	if eventType == "SPELL_AURA_APPLIED" and hasFlag(destFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) and ((spellId == shadowmeldSpellId) or (spellId == invisibilitySpellId) or (spellId == greaterInvisibilitySpellId) or (spellId == shroudOfConcealmentSpellId)) and (self:isPvPZone(GetZoneText())) then
 		PlaySoundFile(self:getSoundFilePath("powerUpInvisibility"), "Master")
 	end
 end
 
+-- plays multi and spree sounds
 function PvPAnnouncers:PlaySounds()
-	local multiKillFileName = killSounds[math.min(5, multiKill)]
+	local multiKillFileName = multiKillSounds[math.min(5, multiKill)]
 	local killSpreeFileName = spreeSounds[math.min(15, killStreak)]
-		
-	if multiKillFileName then
-		PlaySoundFile(self:getSoundFilePath(multiKillFileName), "Master")
-	end
-	
-	if killSpreeFileName then
-		local killSpreePath = self:getSoundFilePath(killSpreeFileName)
 
-		if not multiKillFileName then
-			PlaySoundFile(killSpreePath, "Master")
-		else
-			nextSound = killSpreePath
+	-- smackdown sound always take precedence
+	if nextSoundSmackdownPath then
+		PlaySoundFile(nextSoundSmackdownPath, "Master")
+		
+		if debug then
+			print("smackdown path")
+			print(nextSoundSmackdownPath)
 		end
 	end
+	
+	-- attempt to play the multi kill sound next
+	if multiKillFileName then
+		local multiKillPath = self:getSoundFilePath(multiKillFileName)
+		
+		-- if a smackdown was played, set this to be played later
+		if nextSoundSmackdownPath then
+			nextSoundMultiKillPath = multiKillPath
+			
+			if debug then
+				print("next sound = multi kill path")
+				print(nextSoundMultiKillPath)
+			end
+		-- otherwise play the sound right away
+		else
+			PlaySoundFile(multiKillPath, "Master")
+	
+			if debug then
+				print("multi kill path")
+				print(multiKillPath)
+			end
+		end
+	end
+	
+	-- attempt to play the killing spree sound next
+	if killSpreeFileName then
+		local killSpreePath = self:getSoundFilePath(killSpreeFileName)
+		
+		-- if either smackdown or multi kill was played, set this to be played later
+		if nextSoundSmackdownPath or multiKillFileName then
+			nextSoundKillSpreePath = killSpreePath
+		
+			if debug then
+				print("next sound = kill spree path")
+				print(nextSoundKillSpreePath)
+			end
+		-- if neither smackdown nor multi kill was played, play the sound right away
+		else		
+			PlaySoundFile(killSpreePath, "Master")
+			
+			if debug then
+				print("kill spree path")
+				print(killSpreePath)
+			end
+		end
+	end	
 end
 
 -- resets all local variables to their default state
